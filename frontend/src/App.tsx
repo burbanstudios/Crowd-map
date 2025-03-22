@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -40,7 +40,7 @@ function App() {
 
   return (
     <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
-      {/* UI Overlay */}
+      {/* Titel */}
       <div
         style={{
           position: 'absolute',
@@ -58,9 +58,10 @@ function App() {
         🇸🇪 Crowd Map Sverige
       </div>
 
+      {/* Knapp-panel */}
       <div style={{ position: 'absolute', top: '1rem', right: '1rem', zIndex: 1000 }}>
         <button onClick={() => setDarkMode(!darkMode)} style={{ marginRight: '0.5rem' }}>
-          {darkMode ? '☀️' : '🌙'}
+          {darkMode ? '☀️ Ljust' : '🌙 Mörkt'}
         </button>
         <button onClick={() => setShowHeatmap(!showHeatmap)}>
           {showHeatmap ? '🔵 Dölj Heatmap' : '🔥 Visa Heatmap'}
@@ -78,6 +79,7 @@ function App() {
           url={mapStyle}
         />
 
+        {/* Heatmap */}
         {showHeatmap && data && (
           <HeatmapLayer
             fitBoundsOnLoad
@@ -99,6 +101,7 @@ function App() {
           />
         )}
 
+        {/* Markörer */}
         {data &&
           Object.entries(data).map(([location, info]) => (
             <Marker
