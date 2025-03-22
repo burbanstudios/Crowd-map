@@ -85,9 +85,9 @@ function App() {
             fitBoundsOnLoad
             fitBoundsOnUpdate
             points={heatmapPoints}
-            longitudeExtractor={(m) => m[1]}
-            latitudeExtractor={(m) => m[0]}
-            intensityExtractor={(m) => m[2]}
+            longitudeExtractor={(m: any) => m[1]}
+            latitudeExtractor={(m: any) => m[0]}
+            intensityExtractor={(m: any) => m[2]}
             radius={30}
             blur={25}
             maxZoom={11}
