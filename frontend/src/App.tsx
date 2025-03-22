@@ -22,21 +22,41 @@ function App() {
         .catch((err) => console.error("Error fetching data:", err));
     };
 
-    fetchData(); // hämta direkt vid första render
-
-    const interval = setInterval(fetchData, 5000); // hämta varje 5:e sekund
-
-    return () => clearInterval(interval); // rensa vid unmount
+    fetchData();
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   return (
-    <div style={{ height: '100vh', width: '100%' }}>
-      <h1 style={{ textAlign: 'center', marginTop: '1rem' }}>Crowd Map</h1>
+    <div style={{ height: '100vh', width: '100vw', margin: 0, padding: 0, position: 'relative' }}>
+      {/* Titel-overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          top: '1rem',
+          left: '1rem',
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          color: 'white',
+          padding: '0.5rem 1rem',
+          borderRadius: '8px',
+          fontWeight: 'bold',
+          zIndex: 1000,
+          boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+        }}
+      >
+        🇸🇪 Crowd Map Sverige
+      </div>
 
-      <MapContainer center={[40.75, -73.97]} zoom={13} style={{ height: '90%', width: '100%' }}>
+      {/* Karta */}
+      <MapContainer
+        center={[62.0, 15.0]} // Sverige i fokus
+        zoom={5}
+        style={{ height: '100%', width: '100%' }}
+      >
+        {/* Dark mode-karta */}
         <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>, © CartoDB'
+          url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
         {data &&
