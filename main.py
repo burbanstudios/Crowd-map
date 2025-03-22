@@ -17,9 +17,14 @@ app.add_middleware(
 
 # Platser
 locations = {
-    "Central Park": {"lat": 40.785091, "lon": -73.968285},
-    "Times Square": {"lat": 40.758896, "lon": -73.985130},
-    "Brooklyn Bridge": {"lat": 40.706086, "lon": -73.996864}
+    "Stockholm": {"lat": 59.3293, "lon": 18.0686},
+    "Göteborg": {"lat": 57.7089, "lon": 11.9746},
+    "Malmö": {"lat": 55.6050, "lon": 13.0038},
+    "Uppsala": {"lat": 59.8586, "lon": 17.6389},
+    "Luleå": {"lat": 65.5848, "lon": 22.1547},
+    "Sundsvall": {"lat": 62.3908, "lon": 17.3069},
+    "Visby": {"lat": 57.6348, "lon": 18.2948},
+    "Östersund": {"lat": 63.1792, "lon": 14.6357}
 }
 
 # Historik
