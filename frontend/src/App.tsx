@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -27,8 +28,12 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const heatmapPoints = data
+    ? Object.values(data).map(loc => [loc.lat, loc.lon, loc.people_count])
+    : [];
+
   return (
-    <div style={{ height: '100vh', width: '100vw', margin: 0, padding: 0, position: 'relative' }}>
+    <div style={{ height: '100vh', width: '100vw', margin: 0, padding: 0 }}>
       {/* Titel-overlay */}
       <div
         style={{
@@ -41,7 +46,7 @@ function App() {
           borderRadius: '8px',
           fontWeight: 'bold',
           zIndex: 1000,
-          boxShadow: '0 2px 6px rgba(0,0,0,0.4)',
+          fontSize: 'clamp(1rem, 2vw, 1.5rem)',
         }}
       >
         🇸🇪 Crowd Map Sverige
@@ -49,16 +54,32 @@ function App() {
 
       {/* Karta */}
       <MapContainer
-        center={[62.0, 15.0]} // Sverige i fokus
-        zoom={5}
-        style={{ height: '100%', width: '100%' }}
+        center={[62.0, 15.0]}
+        zoom={5.5}
+        style={{ height: '100vh', width: '100vw' }}
+        scrollWheelZoom={true}
       >
-        {/* Dark mode-karta */}
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/">OpenStreetMap</a>, © CartoDB'
           url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
         />
 
+        {/* Heatmap Layer */}
+        {data && (
+          <HeatmapLayer
+            fitBoundsOnLoad
+            fitBoundsOnUpdate
+            points={heatmapPoints}
+            longitudeExtractor={(m) => m[1]}
+            latitudeExtractor={(m) => m[0]}
+            intensityExtractor={(m) => m[2]}
+            radius={25}
+            blur={20}
+            maxZoom={12}
+          />
+        )}
+
+        {/* Markörer */}
         {data &&
           Object.entries(data).map(([location, info]) => (
             <Marker
