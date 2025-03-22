@@ -1,58 +1,54 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import random
 from datetime import datetime
-from collections import defaultdict
+import random
 
 app = FastAPI()
 
-# Tillåt frontend (Vercel) att anropa detta API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Byt ut * mot din Vercel-URL om du vill begränsa
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Platser
-locations = {
-    "Stockholm": {"lat": 59.3293, "lon": 18.0686},
-    "Göteborg": {"lat": 57.7089, "lon": 11.9746},
-    "Malmö": {"lat": 55.6050, "lon": 13.0038},
-    "Uppsala": {"lat": 59.8586, "lon": 17.6389},
-    "Luleå": {"lat": 65.5848, "lon": 22.1547},
-    "Sundsvall": {"lat": 62.3908, "lon": 17.3069},
-    "Visby": {"lat": 57.6348, "lon": 18.2948},
-    "Östersund": {"lat": 63.1792, "lon": 14.6357}
+# Utökad lista med svenska platser (gallerior, knutpunkter, centrum)
+places = {
+    "Mall of Scandinavia, Stockholm": {"lat": 59.3708, "lon": 18.0034, "threshold": 120},
+    "Gallerian, Stockholm": {"lat": 59.3319, "lon": 18.0634, "threshold": 100},
+    "Stureplan, Stockholm": {"lat": 59.3362, "lon": 18.0736, "threshold": 110},
+    "Mood Stockholm": {"lat": 59.3327, "lon": 18.0669, "threshold": 90},
+    
+    "Nordstan, Göteborg": {"lat": 57.7089, "lon": 11.9706, "threshold": 100},
+    "Avenyn, Göteborg": {"lat": 57.7005, "lon": 11.9746, "threshold": 90},
+    "Frölunda Torg, Göteborg": {"lat": 57.6526, "lon": 11.9111, "threshold": 95},
+
+    "Emporia, Malmö": {"lat": 55.5656, "lon": 12.9874, "threshold": 90},
+    "Mobilia, Malmö": {"lat": 55.5826, "lon": 13.0005, "threshold": 85},
+    "Möllevångstorget, Malmö": {"lat": 55.5916, "lon": 13.0049, "threshold": 75},
+
+    "Gränbystaden, Uppsala": {"lat": 59.8815, "lon": 17.6784, "threshold": 80},
+    "Forumgallerian, Uppsala": {"lat": 59.8597, "lon": 17.6406, "threshold": 70},
+
+    "Väven, Umeå": {"lat": 63.8255, "lon": 20.2627, "threshold": 70},
+    "Avion Shopping, Umeå": {"lat": 63.8133, "lon": 20.2659, "threshold": 75},
+
+    "Strand Galleria, Luleå": {"lat": 65.5848, "lon": 22.1547, "threshold": 60},
+    "Shopping Galleria, Luleå": {"lat": 65.5843, "lon": 22.1516, "threshold": 65},
+    "Clarion Sense, Luleå": {"lat": 65.5840, "lon": 22.1531, "threshold": 40},
 }
-
-# Historik
-historical_data = defaultdict(list)
-
-# Tröskel för notis
-CRITICAL_THRESHOLD = 800
 
 @app.get("/crowd-data")
 def get_crowd_data():
-    timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    data = {}
-
-    for name, pos in locations.items():
-        people = random.randint(5, 1000)
-        data[name] = {
-            "lat": pos["lat"],
-            "lon": pos["lon"],
-            "people_count": people,
-            "timestamp": timestamp,
-            "alert": people >= CRITICAL_THRESHOLD
+    response = {}
+    for name, info in places.items():
+        people_count = random.randint(20, 150)
+        response[name] = {
+            "lat": info["lat"],
+            "lon": info["lon"],
+            "people_count": people_count,
+            "alert": people_count >= info["threshold"],
+            "timestamp": datetime.now().isoformat()
         }
-        historical_data[name].append({"timestamp": timestamp, "people_count": people})
-
-    return data
-
-@app.get("/history/{location}")
-def get_history(location: str):
-    return historical_data.get(location, [])
-
-
+    return response
