@@ -1,5 +1,5 @@
-""import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -12,21 +12,14 @@ interface LocationInfo {
   city: string;
 }
 
-const cities = ["Luleå", "Stockholm", "Göteborg", "Malmö"];
-
-function FlyToCity({ center }: { center: [number, number] }) {
-  const map = useMap();
-  useEffect(() => {
-    map.flyTo(center, 13);
-  }, [center]);
-  return null;
-}
+const cities = ['LULEÅ', 'STOCKHOLM', 'GÖTEBORG'];
 
 function App() {
   const [data, setData] = useState<Record<string, LocationInfo> | null>(null);
-  const [city, setCity] = useState<string>('Luleå');
+  const [selectedCity, setSelectedCity] = useState('LULEÅ');
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResult, setSearchResult] = useState<[string, LocationInfo] | null>(null);
+  const [searchResult, setSearchResult] = useState<LocationInfo | null>(null);
+  const [searchName, setSearchName] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = () => {
@@ -45,113 +38,122 @@ function App() {
       setSearchResult(null);
       return;
     }
-    const match = Object.entries(data).find(
-      ([name, info]) => name.toLowerCase().includes(searchTerm.toLowerCase()) && info.city === city
+    const match = Object.entries(data).find(([name]) =>
+      name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      data[name].city === selectedCity
     );
-    setSearchResult(match || null);
-  }, [searchTerm, data, city]);
+    if (match) {
+      const [name, info] = match;
+      setSearchName(name);
+      setSearchResult(info);
+    } else {
+      setSearchResult(null);
+    }
+  }, [searchTerm, data, selectedCity]);
 
-  const locationsInCity = data
-    ? Object.entries(data).filter(([_, info]) => info.city === city)
-    : [];
+  const mostCrowded = data
+    ? Object.entries(data)
+        .filter(([_, info]) => info.city === selectedCity)
+        .reduce<[string, LocationInfo] | null>((max, entry) => {
+          if (!max || entry[1].people_count > max[1].people_count) return entry;
+          return max;
+        }, null)
+    : null;
 
-  const mostCrowded = locationsInCity.reduce<[string, LocationInfo] | null>((max, curr) => {
-    if (!max || curr[1].people_count > max[1].people_count) return curr;
-    return max;
-  }, null);
-
-  const cityCenters: Record<string, [number, number]> = {
-    Luleå: [65.5848, 22.1547],
-    Stockholm: [59.3293, 18.0686],
-    Göteborg: [57.7089, 11.9746],
-    Malmö: [55.604981, 13.003822],
+  const cityCenter: Record<string, [number, number]> = {
+    LULEÅ: [65.5848, 22.1547],
+    STOCKHOLM: [59.3293, 18.0686],
+    GÖTEBORG: [57.7089, 11.9746]
   };
 
   return (
     <div style={{ height: '100vh', width: '100vw', position: 'relative', fontFamily: 'Roboto, sans-serif' }}>
-
-      {/* Rubrik och meny */}
-      <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 1000 }}>
-        <div style={{ backgroundColor: '#111', color: '#fff', padding: '0.6rem 1.2rem', borderRadius: '12px', fontWeight: 'bold', fontSize: '1.2rem' }}>
-          🇸🇪 Crowd Map
-        </div>
-
-        <select value={city} onChange={(e) => setCity(e.target.value)} style={{ marginTop: '0.5rem', padding: '0.5rem', borderRadius: '8px' }}>
-          {cities.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
+      {/* Header */}
+      <div style={{
+        position: 'absolute', top: 0, width: '100%', background: '#111', color: '#fff',
+        padding: '0.8rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1000
+      }}>
+        <strong>🇸🇪 Crowd Map</strong>
+        <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)} style={{ padding: '0.4rem', borderRadius: 6 }}>
+          {cities.map(city => <option key={city} value={city}>{city}</option>)}
         </select>
+      </div>
 
+      {/* Sökfält */}
+      <div style={{
+        position: 'absolute', top: '3.2rem', width: '100%', padding: '0.5rem 1rem',
+        background: 'rgba(255, 255, 255, 0.95)', zIndex: 1000
+      }}>
         <input
           type="text"
-          placeholder="🔍 Sök plats"
+          placeholder="🔍 Sök plats i vald stad"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ marginTop: '0.5rem', padding: '0.5rem', borderRadius: '8px', width: '220px' }}
+          style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid #ccc' }}
         />
-
-        {searchResult && (
-          <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: '8px' }}>
-            <strong>{searchResult[0]}</strong><br />
-            👥 {searchResult[1].people_count} personer<br />
-            🕒 {new Date(searchResult[1].timestamp).toLocaleTimeString()}<br />
-            {searchResult[1].alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
-          </div>
-        )}
-
-        {mostCrowded && (
-          <div style={{ marginTop: '1rem', background: '#f1f1f1', padding: '0.5rem', borderRadius: '8px' }}>
-            📊 Mest folk i {city}:<br />
-            <strong>{mostCrowded[0]}</strong> – {mostCrowded[1].people_count} personer
+        {searchResult && searchName && (
+          <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: 6 }}>
+            <strong>{searchName}</strong><br />
+            👥 {searchResult.people_count} personer<br />
+            🕒 {new Date(searchResult.timestamp).toLocaleTimeString()}<br />
+            {searchResult.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
           </div>
         )}
       </div>
 
+      {/* Map */}
       <MapContainer
-        center={cityCenters[city]}
-        zoom={12}
+        center={cityCenter[selectedCity]}
+        zoom={13}
         style={{ height: '100%', width: '100%' }}
       >
-        <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <FlyToCity center={cityCenters[city]} />
-
-        {locationsInCity.map(([name, info]) => (
-          <Marker
-            key={name}
-            position={[info.lat, info.lon]}
-            icon={L.icon({
-              iconUrl: info.alert
-                ? 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                : 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-              iconSize: [32, 32],
-            })}
-          >
-            <Popup>
-              <strong>{name}</strong><br />
-              👥 {info.people_count} personer<br />
-              🕒 {new Date(info.timestamp).toLocaleTimeString()}<br />
-              {info.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
-            </Popup>
-          </Marker>
-        ))}
+        <TileLayer
+          attribution='&copy; OpenStreetMap & CartoDB'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+        />
+        {data &&
+          Object.entries(data)
+            .filter(([_, info]) => info.city === selectedCity)
+            .map(([name, info]) => (
+              <Marker
+                key={name}
+                position={[info.lat, info.lon]}
+                icon={L.icon({
+                  iconUrl: info.alert
+                    ? 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                    : 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                  iconSize: [32, 32]
+                })}
+              >
+                <Popup>
+                  <strong>{name}</strong><br />
+                  👥 {info.people_count} personer<br />
+                  🕒 {new Date(info.timestamp).toLocaleTimeString()}<br />
+                  {info.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
+                </Popup>
+              </Marker>
+            ))}
       </MapContainer>
 
-      {/* Bottom nav */}
+      {/* Bottom nav-bar */}
       <div style={{
-        position: 'absolute',
-        bottom: 0,
-        width: '100%',
-        background: 'rgba(255,255,255,0.9)',
-        padding: '0.5rem 1rem',
-        display: 'flex',
-        justifyContent: 'space-around',
-        zIndex: 1000,
-        borderTop: '1px solid #ddd',
+        position: 'absolute', bottom: 0, width: '100%', background: '#111', color: '#fff',
+        display: 'flex', justifyContent: 'space-around', padding: '0.5rem 0', zIndex: 1000
       }}>
-        <div>🏠 Start</div>
-        <div>📍 Platser</div>
-        <div>📊 Statistik</div>
-        <div>⚙️ Inställningar</div>
+        <div style={{ textAlign: 'center' }}>
+          <div>📍</div>
+          <small>Karta</small>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div>📊</div>
+          <small>
+            Mest folk: {mostCrowded ? `${mostCrowded[0]} (${mostCrowded[1].people_count})` : '–'}
+          </small>
+        </div>
+        <div style={{ textAlign: 'center' }}>
+          <div>⚙️</div>
+          <small>Inställn.</small>
+        </div>
       </div>
     </div>
   );
