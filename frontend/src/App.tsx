@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { useEffect, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -16,8 +16,8 @@ function App() {
   const [data, setData] = useState<Record<string, LocationInfo> | null>(null);
   const [showHeatmap, setShowHeatmap] = useState<boolean>(false);
   const [darkMode, setDarkMode] = useState<boolean>(true);
-  const [searchQuery, setSearchQuery] = useState<string>('');
-  const mapRef = useRef<L.Map | null>(null);
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [mapCenter, setMapCenter] = useState<[number, number]>([62.0, 15.0]);
 
   useEffect(() => {
     const fetchData = () => {
@@ -33,19 +33,24 @@ function App() {
   }, []);
 
   const heatmapPoints = data
-    ? Object.values(data).map((loc) => [loc.lat, loc.lon, loc.people_count])
+    ? Object.values(data).map(loc => [loc.lat, loc.lon, loc.people_count])
     : [];
 
   const mapStyle = darkMode
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png';
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
-  // Sökresultat
-  const filteredLocations = data
-    ? Object.entries(data).filter(([location]) =>
-        location.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : [];
+  const handleSearch = () => {
+    if (data) {
+      const match = Object.entries(data).find(([name]) =>
+        name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      if (match) {
+        const [_, info] = match;
+        setMapCenter([info.lat, info.lon]);
+      }
+    }
+  };
 
   return (
     <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
@@ -61,71 +66,65 @@ function App() {
           borderRadius: '8px',
           fontWeight: 'bold',
           zIndex: 1000,
-          fontSize: 'clamp(1rem, 2vw, 1.5rem)',
+          fontSize: 'clamp(1rem, 2vw, 1.5rem)'
         }}
       >
         🇸🇪 Crowd Map Sverige
       </div>
 
       {/* Sökfält */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '1rem',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 1000,
-        }}
-      >
+      <div style={{
+        position: 'absolute',
+        top: '4.5rem',
+        left: '1rem',
+        zIndex: 1000,
+        display: 'flex',
+        gap: '0.5rem'
+      }}>
         <input
           type="text"
-          placeholder="🔍 Sök plats, t.ex. 'ICA Maxi Luleå' eller 'A.Ts Krog'"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Sök plats (ex. ICA Maxi Luleå)"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           style={{
-            padding: '0.5rem 1rem',
-            borderRadius: '8px',
+            padding: '0.5rem',
+            borderRadius: '6px',
             border: '1px solid #ccc',
-            width: '300px',
+            minWidth: '200px'
           }}
         />
+        <button onClick={handleSearch} style={{ padding: '0.5rem 1rem' }}>Sök</button>
       </div>
 
-      {/* Toggle-knappar */}
-      <div style={{ position: 'absolute', bottom: '1rem', right: '1rem', zIndex: 1000 }}>
-        <button
-          onClick={() => setDarkMode(!darkMode)}
-          style={{
-            marginRight: '0.5rem',
-            padding: '0.5rem 0.8rem',
-            borderRadius: '6px',
-            backgroundColor: '#fff',
-            border: '1px solid #ccc',
-          }}
-        >
+      {/* Bottenpanelen för toggles */}
+      <div style={{
+        position: 'absolute',
+        bottom: '1rem',
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 1000,
+        display: 'flex',
+        gap: '1rem',
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        padding: '0.5rem 1rem',
+        borderRadius: '10px',
+        color: 'white'
+      }}>
+        <button onClick={() => setDarkMode(!darkMode)}>
           {darkMode ? '☀️ Ljust' : '🌙 Mörkt'}
         </button>
-        <button
-          onClick={() => setShowHeatmap(!showHeatmap)}
-          style={{
-            padding: '0.5rem 0.8rem',
-            borderRadius: '6px',
-            backgroundColor: showHeatmap ? '#eee' : '#fff',
-            border: '1px solid #ccc',
-          }}
-        >
+        <button onClick={() => setShowHeatmap(!showHeatmap)}>
           {showHeatmap ? '🔵 Dölj Heatmap' : '🔥 Visa Heatmap'}
         </button>
       </div>
 
       <MapContainer
-        center={[62.0, 15.0]}
+        center={mapCenter}
         zoom={5.5}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
-        whenCreated={(mapInstance: L.Map) => (mapRef.current = mapInstance)}
       >
-        <TileLayer attribution="&copy; OpenStreetMap & CartoDB" url={mapStyle} />
+        <TileLayer attribution='&copy; OpenStreetMap & CartoDB' url={mapStyle} />
 
         {/* Heatmap */}
         {showHeatmap && data && (
@@ -144,14 +143,14 @@ function App() {
               0.4: '#0f0',
               0.6: '#ff0',
               0.8: '#f90',
-              1.0: '#f00',
+              1.0: '#f00'
             }}
           />
         )}
 
         {/* Markörer */}
-        {filteredLocations &&
-          filteredLocations.map(([location, info]) => (
+        {data &&
+          Object.entries(data).map(([location, info]) => (
             <Marker
               key={location}
               position={[info.lat, info.lon]}
@@ -163,12 +162,9 @@ function App() {
               })}
             >
               <Popup>
-                <strong>{location}</strong>
-                <br />
-                👥 {info.people_count} personer
-                <br />
-                🕒 {new Date(info.timestamp).toLocaleTimeString()}
-                <br />
+                <strong>{location}</strong><br />
+                👥 {info.people_count} personer<br />
+                🕒 {new Date(info.timestamp).toLocaleTimeString()}<br />
                 {info.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
               </Popup>
             </Marker>
