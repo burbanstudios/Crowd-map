@@ -14,11 +14,10 @@ interface LocationInfo {
 
 function App() {
   const [data, setData] = useState<Record<string, LocationInfo> | null>(null);
+  const [selectedCity, setSelectedCity] = useState<string>('Alla');
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResult, setSearchResult] = useState<LocationInfo | null>(null);
-  const [searchName, setSearchName] = useState<string | null>(null);
-  const [selectedCity, setSelectedCity] = useState('');
-  const [mostCrowded, setMostCrowded] = useState<{ name: string; info: LocationInfo } | null>(null);
+  const [searchResult, setSearchResult] = useState<{ name: string; info: LocationInfo } | null>(null);
+  const [menuOpen, setMenuOpen] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchData = () => {
@@ -32,137 +31,111 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
+  const filteredData = data
+    ? Object.entries(data).filter(([, info]) =>
+        selectedCity === 'Alla' || info.city.toLowerCase() === selectedCity.toLowerCase()
+      )
+    : [];
+
   useEffect(() => {
-    if (!data || searchTerm.trim() === '' || !selectedCity) {
+    if (!data || searchTerm.trim() === '') {
       setSearchResult(null);
       return;
     }
-    const filtered = Object.entries(data).filter(
-      ([, info]) => info.city.toLowerCase() === selectedCity.toLowerCase()
+    const match = Object.entries(data).find(([name]) =>
+      name.toLowerCase().includes(searchTerm.toLowerCase()) &&
+      (selectedCity === 'Alla' || data[name].city.toLowerCase() === selectedCity.toLowerCase())
     );
-    const match = filtered.find(([name]) => name.toLowerCase().includes(searchTerm.toLowerCase()));
     if (match) {
       const [name, info] = match;
-      setSearchName(name);
-      setSearchResult(info);
+      setSearchResult({ name, info });
     } else {
       setSearchResult(null);
     }
-  }, [searchTerm, data, selectedCity]);
+  }, [searchTerm, selectedCity, data]);
 
-  useEffect(() => {
-    if (!data || !selectedCity) {
-      setMostCrowded(null);
-      return;
-    }
-    const cityPlaces = Object.entries(data).filter(([, info]) => info.city.toLowerCase() === selectedCity.toLowerCase());
-    const sorted = cityPlaces.sort((a, b) => b[1].people_count - a[1].people_count);
-    if (sorted.length > 0) {
-      setMostCrowded({ name: sorted[0][0], info: sorted[0][1] });
-    }
-  }, [data, selectedCity]);
+  const mostCrowded = filteredData.reduce((prev, curr) =>
+    curr[1].people_count > prev[1].people_count ? curr : prev,
+    filteredData[0] || ['', { lat: 0, lon: 0, people_count: 0, alert: false, timestamp: '', city: '' }]
+  );
 
-  const filteredData = data
-    ? Object.fromEntries(
-        Object.entries(data).filter(
-          ([, info]) => info.city.toLowerCase() === selectedCity.toLowerCase()
-        )
-      )
-    : null;
-
-  const mapCenter = filteredData
-    ? Object.values(filteredData)[0]
-      ? [Object.values(filteredData)[0].lat, Object.values(filteredData)[0].lon]
-      : [62.0, 15.0]
-    : [62.0, 15.0];
+  const mapStyle = "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png";
 
   return (
     <div style={{ height: '100vh', width: '100vw', position: 'relative', fontFamily: 'Roboto, sans-serif' }}>
-      {/* Header */}
-      <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 1000 }}>
-        <h1 style={{ fontSize: '1.5rem', color: '#fff', background: '#222', padding: '0.5rem 1rem', borderRadius: '8px' }}>
-          🇸🇪 Crowd Map Sverige
-        </h1>
+      {/* Top Bar */}
+      <div style={{ position: 'absolute', top: 10, left: 10, zIndex: 1000 }}>
+        <button onClick={() => setMenuOpen(!menuOpen)} style={{ padding: '0.5rem', fontSize: '1rem' }}>☰ Meny</button>
       </div>
 
-      {/* Stadsväljare */}
-      <div style={{ position: 'absolute', top: '5rem', left: '1rem', zIndex: 1000 }}>
-        <select
-          value={selectedCity}
-          onChange={(e) => setSelectedCity(e.target.value)}
+      {/* Sidebar Menu */}
+      {menuOpen && (
+        <div style={{ position: 'absolute', top: 50, left: 10, zIndex: 1000, background: '#222', color: '#fff', padding: '1rem', borderRadius: '8px' }}>
+          <label>Välj stad:</label><br />
+          <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)}>
+            <option>Alla</option>
+            <option>Luleå</option>
+            <option>Stockholm</option>
+            <option>Uppsala</option>
+            <option>Malmö</option>
+            <option>Göteborg</option>
+          </select>
+        </div>
+      )}
+
+      {/* Search Bar */}
+      <div style={{ position: 'absolute', top: 10, right: 10, zIndex: 1000 }}>
+        <input
+          type="text"
+          placeholder="🔍 Sök plats..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
           style={{ padding: '0.5rem', borderRadius: '6px', width: '250px' }}
-        >
-          <option value="">🌍 Välj plats</option>
-          <option value="Luleå">Luleå</option>
-          <option value="Umeå">Umeå</option>
-          <option value="Stockholm">Stockholm</option>
-        </select>
+        />
+        {searchResult && (
+          <div style={{ background: '#fff', padding: '0.5rem', borderRadius: '6px', marginTop: '0.5rem' }}>
+            <strong>{searchResult.name}</strong><br />
+            👥 {searchResult.info.people_count} personer<br />
+            🕒 {new Date(searchResult.info.timestamp).toLocaleTimeString()}<br />
+            {searchResult.info.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
+          </div>
+        )}
       </div>
 
-      {/* Sökfält */}
-      {selectedCity && (
-        <div style={{ position: 'absolute', top: '9rem', left: '1rem', zIndex: 1000 }}>
-          <input
-            type="text"
-            placeholder="🔍 Sök plats i {selectedCity}"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ padding: '0.5rem', borderRadius: '6px', border: '1px solid #ccc', width: '250px' }}
-          />
-          {searchResult && searchName && (
-            <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: '6px' }}>
-              <strong>{searchName}</strong><br />
-              👥 {searchResult.people_count} personer<br />
-              🕒 {new Date(searchResult.timestamp).toLocaleTimeString()}<br />
-              {searchResult.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
-            </div>
-          )}
-        </div>
-      )}
+      {/* Statistikpanel */}
+      <div style={{ position: 'absolute', bottom: 10, left: 10, zIndex: 1000, background: '#fff', padding: '0.5rem 1rem', borderRadius: '8px', fontWeight: 500 }}>
+        📊 Mest folk just nu i {selectedCity === 'Alla' ? 'Sverige' : selectedCity}:<br />
+        {mostCrowded[0] ? (
+          <span><strong>{mostCrowded[0]}</strong> – {mostCrowded[1].people_count} personer</span>
+        ) : (
+          <span>Ingen data</span>
+        )}
+      </div>
 
-      {/* Statistik-panel */}
-      {mostCrowded && (
-        <div style={{ position: 'absolute', top: '15rem', left: '1rem', zIndex: 1000, background: '#fff', padding: '0.5rem', borderRadius: '6px' }}>
-          📊 Mest folk just nu i {selectedCity}:<br />
-          <strong>{mostCrowded.name}</strong><br />
-          👥 {mostCrowded.info.people_count} personer
-        </div>
-      )}
-
-      <MapContainer
-        center={mapCenter as [number, number]}
-        zoom={12}
-        style={{ height: '100%', width: '100%' }}
-        scrollWheelZoom={true}
-      >
-        <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url='https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
-        />
-
-        {filteredData &&
-          Object.entries(filteredData).map(([location, info]) => (
-            <Marker
-              key={location}
-              position={[info.lat, info.lon]}
-              icon={L.icon({
-                iconUrl: info.alert
-                  ? 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                  : 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                iconSize: [32, 32],
-              })}
-            >
-              <Popup>
-                <strong>{location}</strong><br />
-                👥 {info.people_count} personer<br />
-                🕒 {new Date(info.timestamp).toLocaleTimeString()}<br />
-                {info.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
-              </Popup>
-            </Marker>
-          ))}
+      {/* Map */}
+      <MapContainer center={[62.0, 15.0]} zoom={5.5} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
+        <TileLayer attribution='&copy; OpenStreetMap & CartoDB' url={mapStyle} />
+        {filteredData.map(([location, info]) => (
+          <Marker
+            key={location}
+            position={[info.lat, info.lon]}
+            icon={L.icon({
+              iconUrl: info.alert ? 'https://maps.google.com/mapfiles/ms/icons/red-dot.png' : 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+              iconSize: [32, 32],
+            })}
+          >
+            <Popup>
+              <strong>{location}</strong><br />
+              👥 {info.people_count} personer<br />
+              🕒 {new Date(info.timestamp).toLocaleTimeString()}<br />
+              {info.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
     </div>
   );
 }
 
-export default App;
+export default App;git add frontend/src/App.tsx
+
