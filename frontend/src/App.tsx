@@ -15,7 +15,10 @@ interface LocationInfo {
 function App() {
   const [data, setData] = useState<Record<string, LocationInfo> | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCity, setSelectedCity] = useState<string>('LULEÅ');
+  const [searchResult, setSearchResult] = useState<LocationInfo | null>(null);
+  const [searchName, setSearchName] = useState<string | null>(null);
+  const [selectedCity, setSelectedCity] = useState<string>('');
+  const [mostCrowdedEntry, setMostCrowdedEntry] = useState<[string, LocationInfo] | null>(null);
 
   useEffect(() => {
     const fetchData = () => {
@@ -30,102 +33,102 @@ function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const filteredData = data
-    ? Object.fromEntries(
-        Object.entries(data).filter(([_, loc]) => loc.city === selectedCity)
-      )
-    : {};
+  useEffect(() => {
+    if (!data || searchTerm.trim() === '') {
+      setSearchResult(null);
+      return;
+    }
 
-  const searchMatch = searchTerm && filteredData
-    ? Object.entries(filteredData).find(([name]) =>
-        name.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    : null;
+    const match = Object.entries(data).find(([name]) =>
+      name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
-  const mostCrowded = selectedCity
-    ? Object.entries(filteredData).reduce<[string, LocationInfo] | null>((prev, curr) => {
-        if (!prev || curr[1].people_count > prev[1].people_count) {
-          return curr;
-        }
-        return prev;
-      }, null)
-    : null;
+    if (match) {
+      const [name, info] = match;
+      setSearchName(name);
+      setSearchResult(info);
+    } else {
+      setSearchResult(null);
+    }
+  }, [searchTerm, data]);
 
-  const mapCenter = selectedCity === 'LULEÅ' ? [65.5848, 22.1547]
-                  : selectedCity === 'STOCKHOLM' ? [59.3293, 18.0686]
-                  : selectedCity === 'GÖTEBORG' ? [57.7089, 11.9746]
-                  : [62.0, 15.0]; // fallback
+  useEffect(() => {
+    if (!data || !selectedCity) {
+      setMostCrowdedEntry(null);
+      return;
+    }
+
+    const filteredEntries = Object.entries(data).filter(
+      ([_, info]) => info.city.toLowerCase() === selectedCity.toLowerCase()
+    );
+
+    const mostCrowded =
+      filteredEntries.length > 0
+        ? filteredEntries.reduce<[string, LocationInfo]>((prev, curr) => {
+            return curr[1].people_count > prev[1].people_count ? curr : prev;
+          })
+        : null;
+
+    setMostCrowdedEntry(mostCrowded);
+  }, [data, selectedCity]);
+
+  const mapStyle = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   return (
     <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
-      {/* Menyrad med platsval */}
-      <div style={{
-        position: 'absolute',
-        top: '1rem',
-        left: '1rem',
-        zIndex: 1000,
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '0.5rem',
-        backgroundColor: 'rgba(0,0,0,0.7)',
-        padding: '1rem',
-        borderRadius: '8px',
-        color: 'white'
-      }}>
-        <div style={{ fontWeight: 'bold' }}>🇸🇪 Crowd Map Sverige</div>
+      {/* Titel */}
+      <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 1000 }}>
+        <h1>🇸🇪 Crowd Map Sverige</h1>
+      </div>
 
-        <select
-          value={selectedCity}
-          onChange={(e) => setSelectedCity(e.target.value)}
-          style={{ padding: '0.5rem', borderRadius: '4px' }}
-        >
-          <option value="LULEÅ">Luleå</option>
-          <option value="STOCKHOLM">Stockholm</option>
-          <option value="GÖTEBORG">Göteborg</option>
+      {/* Sök och meny */}
+      <div style={{ position: 'absolute', top: '4rem', left: '1rem', zIndex: 1000 }}>
+        <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)}>
+          <option value="">Välj stad</option>
+          <option value="Luleå">Luleå</option>
+          <option value="Stockholm">Stockholm</option>
+          <option value="Göteborg">Göteborg</option>
         </select>
 
         <input
           type="text"
-          placeholder="🔍 Sök plats i vald stad"
+          placeholder="🔍 Sök plats"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ padding: '0.5rem', borderRadius: '4px' }}
+          style={{ marginTop: '0.5rem', padding: '0.5rem', borderRadius: '6px' }}
         />
+
+        {searchResult && searchName && (
+          <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: '6px' }}>
+            <strong>{searchName}</strong><br />
+            👥 {searchResult.people_count} personer<br />
+            🕒 {new Date(searchResult.timestamp).toLocaleTimeString()}<br />
+            {searchResult.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
+          </div>
+        )}
+
+        {mostCrowdedEntry && (
+          <div style={{ marginTop: '1rem', background: '#e0e0e0', padding: '0.5rem', borderRadius: '6px' }}>
+            <strong>Mest folk just nu i {selectedCity}:</strong><br />
+            📍 {mostCrowdedEntry[0]}<br />
+            👥 {mostCrowdedEntry[1].people_count} personer
+          </div>
+        )}
       </div>
 
-      {/* Statistik – Mest folk just nu */}
-      {mostCrowded && (
-        <div style={{
-          position: 'absolute',
-          top: '1rem',
-          right: '1rem',
-          zIndex: 1000,
-          backgroundColor: 'white',
-          padding: '1rem',
-          borderRadius: '8px',
-          maxWidth: '200px'
-        }}>
-          <strong>📊 Mest folk just nu</strong>
-          <div>{mostCrowded[0]}</div>
-          <div>👥 {mostCrowded[1].people_count} personer</div>
-        </div>
-      )}
-
-      {/* Karta */}
       <MapContainer
-        center={mapCenter as [number, number]}
-        zoom={12}
+        center={[62.0, 15.0]}
+        zoom={5.5}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
       >
         <TileLayer
-          attribution='&copy; OpenStreetMap'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; OpenStreetMap contributors'
+          url={mapStyle}
         />
 
-        {/* Markörer */}
-        {filteredData &&
-          Object.entries(filteredData).map(([location, info]) => (
+        {data &&
+          Object.entries(data).map(([location, info]) => (
             <Marker
               key={location}
               position={[info.lat, info.lon]}
@@ -145,26 +148,6 @@ function App() {
             </Marker>
           ))}
       </MapContainer>
-
-      {/* Sökresultat-popup */}
-      {searchMatch && (
-        <div style={{
-          position: 'absolute',
-          bottom: '1rem',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          zIndex: 1000,
-          backgroundColor: 'white',
-          padding: '1rem',
-          borderRadius: '8px',
-          boxShadow: '0 0 10px rgba(0,0,0,0.3)'
-        }}>
-          <strong>{searchMatch[0]}</strong><br />
-          👥 {searchMatch[1].people_count} personer<br />
-          🕒 {new Date(searchMatch[1].timestamp).toLocaleTimeString()}<br />
-          {searchMatch[1].alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
-        </div>
-      )}
     </div>
   );
 }
