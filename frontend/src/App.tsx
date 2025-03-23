@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -10,19 +10,6 @@ interface LocationInfo {
   people_count: number;
   alert: boolean;
   timestamp: string;
-}
-
-// Komponent för att zooma in på vald plats
-function ZoomToLocation({ location }: { location: LocationInfo | null }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (location) {
-      map.setView([location.lat, location.lon], 14);
-    }
-  }, [location, map]);
-
-  return null;
 }
 
 function App() {
@@ -49,7 +36,6 @@ function App() {
   useEffect(() => {
     if (!data || searchTerm.trim() === '') {
       setSearchResult(null);
-      setSearchName(null);
       return;
     }
 
@@ -63,7 +49,6 @@ function App() {
       setSearchResult(info);
     } else {
       setSearchResult(null);
-      setSearchName(null);
     }
   }, [searchTerm, data]);
 
@@ -76,74 +61,83 @@ function App() {
     : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   return (
-    <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
-      {/* Titel */}
-      <div
-        style={{
-          position: 'absolute',
-          top: '1rem',
-          left: '1rem',
-          backgroundColor: 'rgba(0, 0, 0, 0.7)',
-          color: 'white',
-          padding: '0.5rem 1rem',
-          borderRadius: '8px',
-          fontWeight: 'bold',
-          zIndex: 1000,
-          fontSize: 'clamp(1rem, 2vw, 1.5rem)'
-        }}
-      >
-        🇸🇪 Crowd Map Sverige
+    <div style={{ height: '100vh', width: '100vw', position: 'relative', fontFamily: 'sans-serif' }}>
+      {/* Top-bar */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        zIndex: 1000,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        backgroundColor: darkMode ? 'rgba(0,0,0,0.8)' : 'rgba(255,255,255,0.8)',
+        color: darkMode ? '#fff' : '#000',
+        padding: '0.75rem 1rem',
+        backdropFilter: 'blur(10px)'
+      }}>
+        <div style={{ fontWeight: 'bold', fontSize: '1.2rem' }}>🇸🇪 Crowd Map Sverige</div>
+        <button onClick={() => setDarkMode(!darkMode)} style={{ fontSize: '1.2rem' }}>
+          {darkMode ? '☀️' : '🌙'}
+        </button>
       </div>
 
-      {/* Sökfält */}
-      <div style={{ position: 'absolute', top: '4.5rem', left: '1rem', zIndex: 1000 }}>
+      {/* Search Panel */}
+      <div style={{
+        position: 'absolute',
+        top: '4rem',
+        left: '1rem',
+        zIndex: 1000,
+        background: darkMode ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.9)',
+        padding: '1rem',
+        borderRadius: '12px',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
+        width: '90%',
+        maxWidth: '320px'
+      }}>
         <input
           type="text"
           placeholder="🔍 Sök plats ex. ICA Maxi Luleå"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           style={{
-            padding: '0.5rem',
-            borderRadius: '6px',
+            padding: '0.6rem',
+            borderRadius: '8px',
             border: '1px solid #ccc',
-            width: '250px'
+            width: '100%',
+            marginBottom: '0.5rem'
           }}
         />
         {searchResult && searchName && (
-          <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: '6px' }}>
+          <div style={{ fontSize: '0.9rem' }}>
             <strong>{searchName}</strong><br />
             👥 {searchResult.people_count} personer<br />
             🕒 {new Date(searchResult.timestamp).toLocaleTimeString()}<br />
             {searchResult.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
           </div>
         )}
-        {searchTerm && !searchResult && (
-          <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: '6px' }}>
-            ❌ Ingen plats matchade "{searchTerm}"
-          </div>
-        )}
       </div>
 
-      {/* Knapp-panel */}
+      {/* Buttons */}
       <div style={{
         position: 'absolute',
         bottom: '1rem',
         left: '1rem',
         zIndex: 1000,
         display: 'flex',
+        flexWrap: 'wrap',
         gap: '0.5rem'
       }}>
-        <button onClick={() => setDarkMode(!darkMode)}>
-          {darkMode ? '☀️ Ljust' : '🌙 Mörkt'}
-        </button>
-        <button onClick={() => setShowHeatmap(!showHeatmap)}>
+        <button onClick={() => setShowHeatmap(!showHeatmap)} style={{ padding: '0.6rem 1rem', borderRadius: '10px' }}>
           {showHeatmap ? '🔵 Dölj Heatmap' : '🔥 Visa Heatmap'}
         </button>
       </div>
 
+      {/* Map */}
       <MapContainer
         center={[62.0, 15.0]}
-        zoom={5.5}
+        zoom={window.innerWidth < 768 ? 6.5 : 5.5}
         style={{ height: '100%', width: '100%' }}
         scrollWheelZoom={true}
       >
@@ -152,9 +146,6 @@ function App() {
           url={mapStyle}
         />
 
-        {searchResult && <ZoomToLocation location={searchResult} />}
-
-        {/* Heatmap */}
         {showHeatmap && data && (
           <HeatmapLayer
             fitBoundsOnLoad
@@ -176,7 +167,6 @@ function App() {
           />
         )}
 
-        {/* Markörer */}
         {data &&
           Object.entries(data).map(([location, info]) => (
             <Marker
