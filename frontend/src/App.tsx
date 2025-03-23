@@ -1,6 +1,5 @@
-cat > frontend/src/App.tsx << 'EOF'
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
 import { HeatmapLayer } from 'react-leaflet-heatmap-layer-v3';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -11,6 +10,19 @@ interface LocationInfo {
   people_count: number;
   alert: boolean;
   timestamp: string;
+}
+
+// Komponent för att zooma in på vald plats
+function ZoomToLocation({ location }: { location: LocationInfo | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (location) {
+      map.setView([location.lat, location.lon], 14);
+    }
+  }, [location, map]);
+
+  return null;
 }
 
 function App() {
@@ -37,6 +49,7 @@ function App() {
   useEffect(() => {
     if (!data || searchTerm.trim() === '') {
       setSearchResult(null);
+      setSearchName(null);
       return;
     }
 
@@ -50,6 +63,7 @@ function App() {
       setSearchResult(info);
     } else {
       setSearchResult(null);
+      setSearchName(null);
     }
   }, [searchTerm, data]);
 
@@ -103,6 +117,11 @@ function App() {
             {searchResult.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
           </div>
         )}
+        {searchTerm && !searchResult && (
+          <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: '6px' }}>
+            ❌ Ingen plats matchade "{searchTerm}"
+          </div>
+        )}
       </div>
 
       {/* Knapp-panel */}
@@ -132,6 +151,8 @@ function App() {
           attribution='&copy; OpenStreetMap & CartoDB'
           url={mapStyle}
         />
+
+        {searchResult && <ZoomToLocation location={searchResult} />}
 
         {/* Heatmap */}
         {showHeatmap && data && (
@@ -182,4 +203,3 @@ function App() {
 }
 
 export default App;
-EOF
