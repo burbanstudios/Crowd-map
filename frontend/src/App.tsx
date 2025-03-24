@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import './App.css';
 
 interface LocationInfo {
   lat: number;
@@ -10,128 +9,147 @@ interface LocationInfo {
   people_count: number;
   alert: boolean;
   timestamp: string;
+  previous?: [number, number];
 }
 
-const cities = {
-  "LULEÅ": [65.5848, 22.1547],
-  "STOCKHOLM": [59.3342, 18.0675]
-};
-
 function App() {
-  const [data, setData] = useState<Record<string, LocationInfo>>({});
-  const [selectedCity, setSelectedCity] = useState<keyof typeof cities>("LULEÅ");
-  const [mapCenter, setMapCenter] = useState<[number, number]>(cities["LULEÅ"]);
+  const [data, setData] = useState<Record<string, LocationInfo> | null>(null);
+  const [selectedCity, setSelectedCity] = useState('LULEÅ');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
-  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
-  const [darkMode, setDarkMode] = useState<boolean>(true);
+  const [searchResult, setSearchResult] = useState<LocationInfo | null>(null);
+  const [searchName, setSearchName] = useState<string | null>(null);
+  const [center, setCenter] = useState<[number, number]>([65.5848, 22.1547]);
+  const [showTraffic, setShowTraffic] = useState<boolean>(true);
 
   useEffect(() => {
+    const fetchData = () => {
+      fetch('https://crowd-map-api.onrender.com/crowd-data')
+        .then((res) => res.json())
+        .then((json) => setData(json))
+        .catch((err) => console.error("Error fetching data:", err));
+    };
+
     fetchData();
-    const interval = setInterval(fetchData, 6000);
+    const interval = setInterval(fetchData, 5000);
     return () => clearInterval(interval);
   }, []);
 
-  const fetchData = () => {
-    fetch("https://crowd-map-api.onrender.com/crowd-data")
-      .then((res) => res.json())
-      .then((json) => setData(json))
-      .catch((err) => console.error("Error fetching data:", err));
-  };
-
   useEffect(() => {
-    const center = cities[selectedCity];
-    if (center) setMapCenter(center);
-  }, [selectedCity]);
-
-  useEffect(() => {
-    if (!searchTerm.trim()) {
-      setFilteredSuggestions([]);
+    if (!data || searchTerm.trim() === '') {
+      setSearchResult(null);
       return;
     }
 
-    const suggestions = Object.keys(data).filter((place) =>
-      place.toLowerCase().includes(searchTerm.toLowerCase())
+    const match = Object.entries(data).find(([name]) =>
+      name.toLowerCase().includes(searchTerm.toLowerCase())
     );
-    setFilteredSuggestions(suggestions);
+
+    if (match) {
+      const [name, info] = match;
+      setSearchName(name);
+      setSearchResult(info);
+      setCenter([info.lat, info.lon]);
+    } else {
+      setSearchResult(null);
+    }
   }, [searchTerm, data]);
 
-  const mostCrowded = Object.entries(data)
-    .filter(([name]) => name.toLowerCase().includes(selectedCity.toLowerCase()))
-    .reduce((max, current) => (current[1].people_count > max[1].people_count ? current : max), ["", { people_count: 0 }] as [string, LocationInfo]);
+  const getMostCrowded = (): [string, LocationInfo] | null => {
+    if (!data) return null;
+    return Object.entries(data).reduce<[string, LocationInfo] | null>((max, entry) => {
+      if (!max || entry[1].people_count > max[1].people_count) {
+        return entry as [string, LocationInfo];
+      }
+      return max;
+    }, null);
+  };
 
-  const tileURL = darkMode
-    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+  const mostCrowded = getMostCrowded();
+
+  const getTrafficLines = () => {
+    if (!data || !showTraffic) return null;
+    return Object.values(data)
+      .filter(loc => loc.previous)
+      .map((loc, index) => (
+        <Polyline
+          key={index}
+          positions={[loc.previous!, [loc.lat, loc.lon]]}
+          color={loc.alert ? 'red' : 'blue'}
+        />
+      ));
+  };
+
+  const mapStyle = "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   return (
     <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
-      {/* Stadsväljare */}
-      <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 1000 }}>
-        <select
-          value={selectedCity}
-          onChange={(e) => setSelectedCity(e.target.value as keyof typeof cities)}
-          style={{ padding: '0.5rem', borderRadius: '6px' }}
-        >
-          {Object.keys(cities).map((city) => (
-            <option key={city}>{city}</option>
-          ))}
-        </select>
+      {/* Header */}
+      <div style={{
+        position: 'absolute',
+        top: '1rem',
+        left: '1rem',
+        zIndex: 1000,
+        background: 'white',
+        borderRadius: '8px',
+        padding: '0.5rem 1rem',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
+        fontWeight: 'bold'
+      }}>
+        🇸🇪 Crowd Map Sverige
       </div>
 
-      {/* Sökfält */}
-      <div style={{ position: 'absolute', top: '4.2rem', left: '1rem', zIndex: 1000 }}>
+      {/* Search */}
+      <div style={{ position: 'absolute', top: '4rem', left: '1rem', zIndex: 1000 }}>
         <input
           type="text"
-          placeholder="🔍 Sök plats"
+          placeholder="🔍 Sök plats..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ padding: '0.5rem', width: '250px', borderRadius: '6px' }}
+          style={{ padding: '0.5rem', borderRadius: '6px', width: '220px' }}
         />
-        {filteredSuggestions.length > 0 && (
-          <div style={{ background: '#fff', marginTop: '0.3rem', borderRadius: '6px', maxHeight: '150px', overflowY: 'auto' }}>
-            {filteredSuggestions.map((name) => (
-              <div
-                key={name}
-                onClick={() => {
-                  setSelectedLocation(name);
-                  setSearchTerm(name);
-                  setFilteredSuggestions([]);
-                  const info = data[name];
-                  setMapCenter([info.lat, info.lon]);
-                }}
-                style={{ padding: '0.3rem 0.5rem', cursor: 'pointer' }}
-              >
-                {name}
-              </div>
-            ))}
+        {searchResult && searchName && (
+          <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: '6px' }}>
+            <strong>{searchName}</strong><br />
+            👥 {searchResult.people_count} personer<br />
+            🕒 {new Date(searchResult.timestamp).toLocaleTimeString()}<br />
+            {searchResult.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
           </div>
         )}
       </div>
 
-      {/* Info-ruta för vald plats */}
-      {selectedLocation && data[selectedLocation] && (
-        <div style={{ position: 'absolute', top: '10rem', left: '1rem', background: 'white', padding: '0.5rem', borderRadius: '6px', zIndex: 1000 }}>
-          <strong>{selectedLocation}</strong><br />
-          👥 {data[selectedLocation].people_count} personer<br />
-          🕒 {new Date(data[selectedLocation].timestamp).toLocaleTimeString()}<br />
-          {data[selectedLocation].alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
-        </div>
-      )}
+      {/* Bottom nav */}
+      <div style={{
+        position: 'absolute',
+        bottom: 0,
+        width: '100%',
+        display: 'flex',
+        justifyContent: 'space-around',
+        background: 'white',
+        padding: '0.5rem 0',
+        zIndex: 1000,
+        boxShadow: '0 -2px 6px rgba(0,0,0,0.1)'
+      }}>
+        <button onClick={() => setShowTraffic(!showTraffic)}>
+          {showTraffic ? '🚦 Dölj Trafikflöde' : '🚦 Visa Trafikflöde'}
+        </button>
+        {mostCrowded && (
+          <div>
+            🔝 Mest folk: <strong>{mostCrowded[0]}</strong> ({mostCrowded[1].people_count})
+          </div>
+        )}
+      </div>
 
-      {/* Mest folk just nu */}
-      {mostCrowded[0] && (
-        <div style={{ position: 'absolute', bottom: '5rem', left: '1rem', background: 'white', padding: '0.5rem', borderRadius: '6px', zIndex: 1000 }}>
-          📊 Mest folk just nu i {selectedCity}:<br />
-          <strong>{mostCrowded[0]}</strong><br />
-          👥 {mostCrowded[1].people_count} personer
-        </div>
-      )}
+      <MapContainer
+        center={center}
+        zoom={12}
+        style={{ height: '100%', width: '100%' }}
+        scrollWheelZoom={true}
+      >
+        <TileLayer url={mapStyle} />
 
-      {/* Karta */}
-      <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
-        <TileLayer attribution='&copy; OpenStreetMap & CartoDB' url={tileURL} />
-        {Object.entries(data).map(([name, info]) => (
+        {getTrafficLines()}
+
+        {data && Object.entries(data).map(([name, info]) => (
           <Marker
             key={name}
             position={[info.lat, info.lon]}
@@ -151,30 +169,6 @@ function App() {
           </Marker>
         ))}
       </MapContainer>
-
-      {/* Bottom Navbar */}
-      <div style={{
-        position: 'absolute',
-        bottom: 0,
-        left: 0,
-        width: '100%',
-        background: darkMode ? '#111' : '#eee',
-        color: darkMode ? '#fff' : '#000',
-        display: 'flex',
-        justifyContent: 'space-around',
-        padding: '1rem 0',
-        zIndex: 1000
-      }}>
-        <button onClick={() => setDarkMode(!darkMode)}>
-          {darkMode ? '☀️' : '🌙'}
-        </button>
-        <button onClick={() => setSearchTerm('')}>
-          🔍 Sök
-        </button>
-        <button onClick={() => window.location.reload()}>
-          🔄 Uppdatera
-        </button>
-      </div>
     </div>
   );
 }
