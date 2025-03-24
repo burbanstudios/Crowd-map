@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import './App.css';
 
 interface LocationInfo {
   lat: number;
@@ -9,151 +10,170 @@ interface LocationInfo {
   people_count: number;
   alert: boolean;
   timestamp: string;
-  city: string;
 }
 
-const cities = ['LULEÅ', 'STOCKHOLM', 'GÖTEBORG'];
+const cities = {
+  "LULEÅ": [65.5848, 22.1547],
+  "STOCKHOLM": [59.3342, 18.0675]
+};
 
 function App() {
-  const [data, setData] = useState<Record<string, LocationInfo> | null>(null);
-  const [selectedCity, setSelectedCity] = useState('LULEÅ');
+  const [data, setData] = useState<Record<string, LocationInfo>>({});
+  const [selectedCity, setSelectedCity] = useState<keyof typeof cities>("LULEÅ");
+  const [mapCenter, setMapCenter] = useState<[number, number]>(cities["LULEÅ"]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [searchResult, setSearchResult] = useState<LocationInfo | null>(null);
-  const [searchName, setSearchName] = useState<string | null>(null);
+  const [filteredSuggestions, setFilteredSuggestions] = useState<string[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [darkMode, setDarkMode] = useState<boolean>(true);
 
   useEffect(() => {
-    const fetchData = () => {
-      fetch('https://crowd-map-api.onrender.com/crowd-data')
-        .then((res) => res.json())
-        .then((json) => setData(json))
-        .catch((err) => console.error("Error fetching data:", err));
-    };
     fetchData();
-    const interval = setInterval(fetchData, 5000);
+    const interval = setInterval(fetchData, 6000);
     return () => clearInterval(interval);
   }, []);
 
-  useEffect(() => {
-    if (!data || searchTerm.trim() === '') {
-      setSearchResult(null);
-      return;
-    }
-    const match = Object.entries(data).find(([name]) =>
-      name.toLowerCase().includes(searchTerm.toLowerCase()) &&
-      data[name].city === selectedCity
-    );
-    if (match) {
-      const [name, info] = match;
-      setSearchName(name);
-      setSearchResult(info);
-    } else {
-      setSearchResult(null);
-    }
-  }, [searchTerm, data, selectedCity]);
-
-  const mostCrowded = data
-    ? Object.entries(data)
-        .filter(([_, info]) => info.city === selectedCity)
-        .reduce<[string, LocationInfo] | null>((max, entry) => {
-          if (!max || entry[1].people_count > max[1].people_count) return entry;
-          return max;
-        }, null)
-    : null;
-
-  const cityCenter: Record<string, [number, number]> = {
-    LULEÅ: [65.5848, 22.1547],
-    STOCKHOLM: [59.3293, 18.0686],
-    GÖTEBORG: [57.7089, 11.9746]
+  const fetchData = () => {
+    fetch("https://crowd-map-api.onrender.com/crowd-data")
+      .then((res) => res.json())
+      .then((json) => setData(json))
+      .catch((err) => console.error("Error fetching data:", err));
   };
 
+  useEffect(() => {
+    const center = cities[selectedCity];
+    if (center) setMapCenter(center);
+  }, [selectedCity]);
+
+  useEffect(() => {
+    if (!searchTerm.trim()) {
+      setFilteredSuggestions([]);
+      return;
+    }
+
+    const suggestions = Object.keys(data).filter((place) =>
+      place.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+    setFilteredSuggestions(suggestions);
+  }, [searchTerm, data]);
+
+  const mostCrowded = Object.entries(data)
+    .filter(([name]) => name.toLowerCase().includes(selectedCity.toLowerCase()))
+    .reduce((max, current) => (current[1].people_count > max[1].people_count ? current : max), ["", { people_count: 0 }] as [string, LocationInfo]);
+
+  const tileURL = darkMode
+    ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+    : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
   return (
-    <div style={{ height: '100vh', width: '100vw', position: 'relative', fontFamily: 'Roboto, sans-serif' }}>
-      {/* Header */}
-      <div style={{
-        position: 'absolute', top: 0, width: '100%', background: '#111', color: '#fff',
-        padding: '0.8rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', zIndex: 1000
-      }}>
-        <strong>🇸🇪 Crowd Map</strong>
-        <select value={selectedCity} onChange={(e) => setSelectedCity(e.target.value)} style={{ padding: '0.4rem', borderRadius: 6 }}>
-          {cities.map(city => <option key={city} value={city}>{city}</option>)}
+    <div style={{ height: '100vh', width: '100vw', position: 'relative' }}>
+      {/* Stadsväljare */}
+      <div style={{ position: 'absolute', top: '1rem', left: '1rem', zIndex: 1000 }}>
+        <select
+          value={selectedCity}
+          onChange={(e) => setSelectedCity(e.target.value as keyof typeof cities)}
+          style={{ padding: '0.5rem', borderRadius: '6px' }}
+        >
+          {Object.keys(cities).map((city) => (
+            <option key={city}>{city}</option>
+          ))}
         </select>
       </div>
 
       {/* Sökfält */}
-      <div style={{
-        position: 'absolute', top: '3.2rem', width: '100%', padding: '0.5rem 1rem',
-        background: 'rgba(255, 255, 255, 0.95)', zIndex: 1000
-      }}>
+      <div style={{ position: 'absolute', top: '4.2rem', left: '1rem', zIndex: 1000 }}>
         <input
           type="text"
-          placeholder="🔍 Sök plats i vald stad"
+          placeholder="🔍 Sök plats"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          style={{ width: '100%', padding: '0.5rem', borderRadius: 6, border: '1px solid #ccc' }}
+          style={{ padding: '0.5rem', width: '250px', borderRadius: '6px' }}
         />
-        {searchResult && searchName && (
-          <div style={{ marginTop: '0.5rem', background: '#fff', padding: '0.5rem', borderRadius: 6 }}>
-            <strong>{searchName}</strong><br />
-            👥 {searchResult.people_count} personer<br />
-            🕒 {new Date(searchResult.timestamp).toLocaleTimeString()}<br />
-            {searchResult.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
+        {filteredSuggestions.length > 0 && (
+          <div style={{ background: '#fff', marginTop: '0.3rem', borderRadius: '6px', maxHeight: '150px', overflowY: 'auto' }}>
+            {filteredSuggestions.map((name) => (
+              <div
+                key={name}
+                onClick={() => {
+                  setSelectedLocation(name);
+                  setSearchTerm(name);
+                  setFilteredSuggestions([]);
+                  const info = data[name];
+                  setMapCenter([info.lat, info.lon]);
+                }}
+                style={{ padding: '0.3rem 0.5rem', cursor: 'pointer' }}
+              >
+                {name}
+              </div>
+            ))}
           </div>
         )}
       </div>
 
-      {/* Map */}
-      <MapContainer
-        center={cityCenter[selectedCity]}
-        zoom={13}
-        style={{ height: '100%', width: '100%' }}
-      >
-        <TileLayer
-          attribution='&copy; OpenStreetMap & CartoDB'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        />
-        {data &&
-          Object.entries(data)
-            .filter(([_, info]) => info.city === selectedCity)
-            .map(([name, info]) => (
-              <Marker
-                key={name}
-                position={[info.lat, info.lon]}
-                icon={L.icon({
-                  iconUrl: info.alert
-                    ? 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
-                    : 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
-                  iconSize: [32, 32]
-                })}
-              >
-                <Popup>
-                  <strong>{name}</strong><br />
-                  👥 {info.people_count} personer<br />
-                  🕒 {new Date(info.timestamp).toLocaleTimeString()}<br />
-                  {info.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
-                </Popup>
-              </Marker>
-            ))}
+      {/* Info-ruta för vald plats */}
+      {selectedLocation && data[selectedLocation] && (
+        <div style={{ position: 'absolute', top: '10rem', left: '1rem', background: 'white', padding: '0.5rem', borderRadius: '6px', zIndex: 1000 }}>
+          <strong>{selectedLocation}</strong><br />
+          👥 {data[selectedLocation].people_count} personer<br />
+          🕒 {new Date(data[selectedLocation].timestamp).toLocaleTimeString()}<br />
+          {data[selectedLocation].alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
+        </div>
+      )}
+
+      {/* Mest folk just nu */}
+      {mostCrowded[0] && (
+        <div style={{ position: 'absolute', bottom: '5rem', left: '1rem', background: 'white', padding: '0.5rem', borderRadius: '6px', zIndex: 1000 }}>
+          📊 Mest folk just nu i {selectedCity}:<br />
+          <strong>{mostCrowded[0]}</strong><br />
+          👥 {mostCrowded[1].people_count} personer
+        </div>
+      )}
+
+      {/* Karta */}
+      <MapContainer center={mapCenter} zoom={13} style={{ height: '100%', width: '100%' }}>
+        <TileLayer attribution='&copy; OpenStreetMap & CartoDB' url={tileURL} />
+        {Object.entries(data).map(([name, info]) => (
+          <Marker
+            key={name}
+            position={[info.lat, info.lon]}
+            icon={L.icon({
+              iconUrl: info.alert
+                ? 'https://maps.google.com/mapfiles/ms/icons/red-dot.png'
+                : 'https://maps.google.com/mapfiles/ms/icons/green-dot.png',
+              iconSize: [32, 32],
+            })}
+          >
+            <Popup>
+              <strong>{name}</strong><br />
+              👥 {info.people_count} personer<br />
+              🕒 {new Date(info.timestamp).toLocaleTimeString()}<br />
+              {info.alert && <span style={{ color: 'red' }}>⚠️ Tröskel nådd!</span>}
+            </Popup>
+          </Marker>
+        ))}
       </MapContainer>
 
-      {/* Bottom nav-bar */}
+      {/* Bottom Navbar */}
       <div style={{
-        position: 'absolute', bottom: 0, width: '100%', background: '#111', color: '#fff',
-        display: 'flex', justifyContent: 'space-around', padding: '0.5rem 0', zIndex: 1000
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        width: '100%',
+        background: darkMode ? '#111' : '#eee',
+        color: darkMode ? '#fff' : '#000',
+        display: 'flex',
+        justifyContent: 'space-around',
+        padding: '1rem 0',
+        zIndex: 1000
       }}>
-        <div style={{ textAlign: 'center' }}>
-          <div>📍</div>
-          <small>Karta</small>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div>📊</div>
-          <small>
-            Mest folk: {mostCrowded ? `${mostCrowded[0]} (${mostCrowded[1].people_count})` : '–'}
-          </small>
-        </div>
-        <div style={{ textAlign: 'center' }}>
-          <div>⚙️</div>
-          <small>Inställn.</small>
-        </div>
+        <button onClick={() => setDarkMode(!darkMode)}>
+          {darkMode ? '☀️' : '🌙'}
+        </button>
+        <button onClick={() => setSearchTerm('')}>
+          🔍 Sök
+        </button>
+        <button onClick={() => window.location.reload()}>
+          🔄 Uppdatera
+        </button>
       </div>
     </div>
   );
